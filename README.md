@@ -4,6 +4,10 @@
 <img src="https://github.com/moatazeldebsy/parallelize-android-UI-Tests/blob/main/1.png">
 </p>
 
+<p align="center">
+<img src="https://github.com/moatazeldebsy/parallelize-android-UI-Tests/blob/main/2.png">
+</p>
+
 ## Project Setup:
 - Create your Free [Bitrise account](https://app.bitrise.io/referral/27c9a409fb484d6b)
 - [Flank](https://github.com/Flank/flank/)
