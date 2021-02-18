@@ -1,0 +1,26 @@
+gcloud:
+  results-bucket: YOUR_BUCKET_NAME
+  results-dir: $BITRISE_BUILD_NUMBER
+  record-video: true
+  timeout: 30m
+  async: false
+  app: $BITRISE_APK_PATH
+  test: $BITRISE_TEST_APK_PATH
+  use-orchestrator: false
+  environment-variables:
+    coverage: true
+    coverageFilePath: "/sdcard/"
+    clearPackageData: true
+  directories-to-pull:
+    - "/sdcard/"
+  performance-metrics: false
+  test-targets:
+    - "annotation com.sample.samplecalculator.utils.RegressionTest"
+  device:
+    - model: "Pixel2"
+      version: "28"
+flank:
+  max-test-shards: 3
+  num-test-runs: 1
+  shard-time: 30
+  smart-flank-gcs-path: "gs://YOUR_BUCKET_NAME/android_ta.xml"

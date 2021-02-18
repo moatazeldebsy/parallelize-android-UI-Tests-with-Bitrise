@@ -1,0 +1,101 @@
+---
+format_version: '8'
+default_step_lib_source: 'https://github.com/bitrise-io/bitrise-steplib.git'
+project_type: android
+trigger_map:
+- push_branch: '*'
+  workflow: primary
+- pull_request_source_branch: '*'
+  workflow: primary
+workflows:
+  primary:
+    steps:
+    - activate-ssh-key@4:
+        run_if: '{{getenv "SSH_RSA_PRIVATE_KEY" | ne ""}}'
+    - git-clone@4: {}
+    - cache-pull@2: {}
+    - file-downloader@1:
+        title: Download Google Service Account JSON
+        inputs:
+        - source: $YOUR_SERVICE_ACCOUNT_URL
+        - destination: ./keys/firebase-key.json
+    - script@1:
+        inputs:
+        - content: >-
+            #!/usr/bin/env bash
+            # fail if any commands fails
+            set -e
+            # debug log
+            set -x
+            echo "$SERVICE_ACCOUNT_KEY_JSON" >
+            $HOME/.config/gcloud/application_default_credentials.json
+            gcloud auth activate-service-account --project=$GOOGLE_CLOUD_PROJECT
+            --key-file=$SERVICE_ACCOUNT_KEY_JSON
+        title: Save Google Service Account JSON
+    - install-missing-android-tools@2:
+        inputs:
+        - gradlew_path: $PROJECT_LOCATION/gradlew
+    - android-build-for-ui-testing@0:
+        inputs:
+        - variant: debug
+        - module: app
+    - script@1:
+        title: Generate Flank config
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            # fail if any commands fails
+            set -e
+            # debug log
+            set -x
+            cat << FLANKEOF > ./flank.yml
+            gcloud:
+              results-bucket: {YOUR BUCKET NAME}
+              results-dir: $BITRISE_BUILD_NUMBER
+              record-video: true
+              timeout: 30m
+              async: false
+              app: $BITRISE_APK_PATH
+              test: $BITRISE_TEST_APK_PATH
+              use-orchestrator: false
+              environment-variables:
+                coverage: true
+                coverageFilePath: "/sdcard/"
+                clearPackageData: true
+              directories-to-pull:
+              - "/sdcard/"
+              performance-metrics: false
+              test-targets:
+                - "annotation com.sample.samplecalculator.utils.RegressionTest"
+              device:
+              - model: "Pixel2"
+                version: "28"
+            flank:
+              max-test-shards: 3
+              num-test-runs: 1
+              shard-time: 30
+              smart-flank-gcs-path: "gs://{YOUR_BUCKET_NAME}/android_ta.xml"
+              test-targets-always-run:
+              - "annotation com.sample.samplecalculator.utils.RegressionTest"
+    - script@1:
+        title: Run Flank
+        inputs:
+        - content: >-
+            #!/usr/bin/env bash
+            wget --quiet
+            https://github.com/TestArmada/flank/releases/download/v21.02.0/flank.jar
+            -O /usr/local/bin/flank.jar
+            java -jar /usr/local/bin/flank.jar firebase test android run
+    - deploy-to-bitrise-io@1: {}
+    - cache-push@2: {}
+app:
+  envs:
+  - opts:
+      is_expand: false
+    PROJECT_LOCATION: .
+  - opts:
+      is_expand: false
+    MODULE: app
+  - opts:
+      is_expand: false
+    VARIANT: debug
