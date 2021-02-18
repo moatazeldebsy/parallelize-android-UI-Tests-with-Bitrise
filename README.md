@@ -22,9 +22,4 @@ You should do the following steps:
 - Don’t forget to enable the **Google Cloud Testing API** and **Cloud Tool Results API** in the Google Developers Console API. This is important for uploading the APKs and accessing the results.
 - Configure Flank to your needs with `flank.yml`
 
-* Clone the repo
-* Build the app & test application
-
-`./gradlw connectedDebugAndroidTest`
-
 You can find the `flank.yml` in flank directory and also the `bitrise.yml` file. 
