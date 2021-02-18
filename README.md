@@ -1,5 +1,5 @@
 # Eespresso-Bitrise
-## Demo for running parallelize Android UI Tests with Bitrise, Firebase TestLab and Flank
+## Demo for running parallelize Android UI Tests with Bitrise, Firebase TestLab and Flank - Bitrise User Group #7
 
 ## Project Setup:
 - Create your Free [Bitrise account](https://app.bitrise.io/referral/27c9a409fb484d6b)
