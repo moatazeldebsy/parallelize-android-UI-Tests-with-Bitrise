@@ -19,9 +19,11 @@ You should do the following steps:
 - Add your project to firebase
 - Create a service account to get access over the API
 - Download the json file which contains the private key which can be added directly as an GENERIC FILE STORAGE in your Bitrise project and used it for authentication. like the following image. 
+
 <p align="center">
 <img src="https://github.com/moatazeldebsy/parallelize-android-UI-Tests/blob/main/4.png">
 </p>
+
 - Don’t forget to enable the **Google Cloud Testing API** and **Cloud Tool Results API** in the Google Developers Console API. This is important for uploading the APKs and accessing the results.
 - Configure Flank to your needs with `flank.yml`
 - Add path of your service account json file as `Secrets` in Bitrise like the following image
