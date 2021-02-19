@@ -1,5 +1,5 @@
 gcloud:
-  results-bucket: YOUR_BUCKET_NAME
+  results-bucket: ADD_YOUR_BUCKET_NAME
   results-dir: $BITRISE_BUILD_NUMBER
   record-video: true
   timeout: 30m
