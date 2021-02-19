@@ -17,7 +17,7 @@ workflows:
     - file-downloader@1:
         title: Download Google Service Account JSON
         inputs:
-        - source: $YOUR_SERVICE_ACCOUNT_URL
+        - source: $ADD_YOUR_SERVICE_ACCOUNT_URL
         - destination: ./keys/firebase-key.json
     - script@1:
         inputs:
