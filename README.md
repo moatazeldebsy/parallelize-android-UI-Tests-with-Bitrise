@@ -26,7 +26,7 @@ You should do the following steps:
 
 - Don’t forget to enable the **Google Cloud Testing API** and **Cloud Tool Results API** in the Google Developers Console API. This is important for uploading the APKs and accessing the results.
 - Configure Flank to your needs with `flank.yml`
-- Add path of your service account json file as `Secrets` in Bitrise like the following image
+- Add path of your `service account json`file as `Secrets` in Bitrise like the following image
 
 <p align="center">
 <img src="https://github.com/moatazeldebsy/parallelize-android-UI-Tests/blob/main/3.png">
