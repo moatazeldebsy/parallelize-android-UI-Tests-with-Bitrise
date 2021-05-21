@@ -1,5 +1,7 @@
 ## Demo for running parallelize Android UI Tests with Bitrise, Firebase TestLab and Flank - Bitrise User Group #7 :rocket:
 
+You can watch the full video from here: https://www.youtube.com/watch?v=_KGaJie0Qbc
+
 <p align="center">
 <img src="https://github.com/moatazeldebsy/parallelize-android-UI-Tests/blob/main/1.png">
 </p>
