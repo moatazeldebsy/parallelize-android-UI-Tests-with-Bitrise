@@ -1,101 +1,107 @@
----
-format_version: '8'
-default_step_lib_source: 'https://github.com/bitrise-io/bitrise-steplib.git'
-project_type: android
-trigger_map:
-- push_branch: '*'
-  workflow: primary
-- pull_request_source_branch: '*'
-  workflow: primary
+format_version: 7
+default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
+
+app:
+  envs:
+  - GOOGLE_SERVICE_ACCOUNT: $GOOGLE_SERVICE_ACCOUNT
+  - FLANK_CONFIG: $FLANK_CONFIG
+  - FLANK_CONFIG_IOS: $FLANK_CONFIG_IOS
+  - SAMPLE_ANDROID_APP_GIT_URL: "https://github.com/bitrise-io/android-multiple-test-results-sample"
+  - SAMPLE_IOS_APP_URL: https://github.com/bitrise-io/sample-apps-ios-simple-objc-with-uitest.git
+  - SAMPLE_IOS_APP_BRANCH: bitrise_bot_signing
+
 workflows:
-  primary:
+  test:
+    before_run:
+    - audit-this-step
     steps:
-    - activate-ssh-key@4:
-        run_if: '{{getenv "SSH_RSA_PRIVATE_KEY" | ne ""}}'
-    - git-clone@4: {}
-    - cache-pull@2: {}
-    - file-downloader@1:
-        title: Download Google Service Account JSON
-        inputs:
-        - source: $ADD_YOUR_SERVICE_ACCOUNT_URL
-        - destination: ./keys/firebase-key.json
-    - script@1:
-        inputs:
-        - content: >-
-            #!/usr/bin/env bash
-            # fail if any commands fails
-            set -e
-            # debug log
-            set -x
-            echo "$SERVICE_ACCOUNT_KEY_JSON" >
-            $HOME/.config/gcloud/application_default_credentials.json
-            gcloud auth activate-service-account --project=$GOOGLE_CLOUD_PROJECT
-            --key-file=$SERVICE_ACCOUNT_KEY_JSON
-        title: Save Google Service Account JSON
-    - install-missing-android-tools@2:
-        inputs:
-        - gradlew_path: $PROJECT_LOCATION/gradlew
-    - android-build-for-ui-testing@0:
-        inputs:
-        - variant: debug
-        - module: app
-    - script@1:
-        title: Generate Flank config
+    - go-list:
+    - golint:
+    - errcheck:
+    - go-test:
+    - script:
+        title: "Clean-up"
         inputs:
         - content: |-
             #!/usr/bin/env bash
-            # fail if any commands fails
-            set -e
-            # debug log
-            set -x
-            cat << FLANKEOF > ./flank.yml
-            gcloud:
-              results-bucket: {YOUR BUCKET NAME}
-              results-dir: $BITRISE_BUILD_NUMBER
-              record-video: true
-              timeout: 30m
-              async: false
-              app: $BITRISE_APK_PATH
-              test: $BITRISE_TEST_APK_PATH
-              use-orchestrator: false
-              environment-variables:
-                coverage: true
-                coverageFilePath: "/sdcard/"
-                clearPackageData: true
-              directories-to-pull:
-              - "/sdcard/"
-              performance-metrics: false
-              test-targets:
-                - "annotation com.sample.samplecalculator.utils.RegressionTest"
-              device:
-              - model: "Pixel2"
-                version: "28"
-            flank:
-              max-test-shards: 3
-              num-test-runs: 1
-              shard-time: 30
-              smart-flank-gcs-path: "gs://{YOUR_BUCKET_NAME}/android_ta.xml"
-              test-targets-always-run:
-              - "annotation com.sample.samplecalculator.utils.RegressionTest"
-    - script@1:
-        title: Run Flank
+            set -ex
+
+            rm -rf ./_tmp
+    - change-workdir:
+        title: Switch working dir to test/_tmp dir
+        run_if: true
         inputs:
-        - content: >-
+        - path: ./_tmp
+        - is_create_path: true
+    - script:
+        title: "Git clone sample android project"
+        inputs:
+        - content: |-
             #!/usr/bin/env bash
-            wget --quiet
-            https://github.com/TestArmada/flank/releases/download/v21.02.0/flank.jar
-            -O /usr/local/bin/flank.jar
-            java -jar /usr/local/bin/flank.jar firebase test android run
-    - deploy-to-bitrise-io@1: {}
-    - cache-push@2: {}
-app:
-  envs:
-  - opts:
-      is_expand: false
-    PROJECT_LOCATION: .
-  - opts:
-      is_expand: false
-    MODULE: app
-  - opts:
-      is_expand: false
-    VARIANT: debug
+            set -ex
+
+            git clone "$SAMPLE_ANDROID_APP_GIT_URL" -b "no-failures" .
+    - install-missing-android-tools:
+        title: "Install missing android tools"
+        inputs:
+        - gradlew_path: ./gradlew
+    - android-build-for-ui-testing:
+        title: "Build test apks"
+        inputs:
+        - module: app
+        - variant: debug
+    - script:
+        title: "Store Flank config"
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -ex
+
+            echo "$FLANK_CONFIG" > ./flank.yml
+    - path::./:
+        title: Test Step - Android
+        inputs:
+        - google_service_account_json: $GOOGLE_SERVICE_ACCOUNT
+        - config_path: ./flank.yml
+    - change-workdir:
+        title: Switch working dir to test/_tmp dir
+        run_if: true
+        inputs:
+        - path: ./_tmp
+        - is_create_path: true
+    - script:
+        title: "Git clone sample ios project"
+        inputs:
+        - content: |-
+            #!/bin/bash
+            set -ex
+            git clone -b "$SAMPLE_IOS_APP_BRANCH" "$SAMPLE_IOS_APP_URL" .
+    - certificate-and-profile-installer:
+    - xcode-build-for-test:
+        title: Build xcode test
+        inputs:
+        - project_path: ./ios-simple-objc/ios-simple-objc.xcodeproj
+        - scheme: ios-simple-objc
+        - output_tool: xcodebuild
+    - script:
+        title: "Store Flank config"
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -ex
+
+            echo "$FLANK_CONFIG_IOS" > ./flank.yml
+    - path::./:
+        title: Test Step - iOS
+        inputs:
+        - google_service_account_json: $GOOGLE_SERVICE_ACCOUNT
+        - config_path: ./flank.yml
+
+  audit-this-step:
+    steps:
+    - script:
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -ex
+            stepman audit --step-yml ./step.yml
