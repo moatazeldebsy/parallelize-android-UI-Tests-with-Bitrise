@@ -1,5 +1,5 @@
 gcloud:
-  results-bucket: ADD_YOUR_BUCKET_NAME
+  results-bucket: ta-report
   results-dir: $BITRISE_BUILD_NUMBER
   record-video: true
   timeout: 30m
@@ -17,10 +17,10 @@ gcloud:
   test-targets:
     - "annotation com.sample.samplecalculator.utils.RegressionTest"
   device:
-    - model: "Pixel2"
-      version: "28"
+    - model: "Pixel3"
+      version: "30"
 flank:
   max-test-shards: 3
   num-test-runs: 1
   shard-time: 30
-  smart-flank-gcs-path: "gs://YOUR_BUCKET_NAME/android_ta.xml"
+  smart-flank-gcs-path: "gs://ta-report/android_ta.xml"
