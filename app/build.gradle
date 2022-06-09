@@ -6,7 +6,6 @@ buildscript {
         mavenCentral()
     }
 }
-
 android {
     compileSdkVersion 32
     dataBinding.enabled = true
@@ -29,14 +28,18 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments clearPackageData: 'true'
+
 
     }
     testOptions {
         execution 'ANDROIDX_TEST_ORCHESTRATOR'
+        animationsDisabled = true
     }
     buildTypes {
         debug {
             minifyEnabled false
+            testCoverageEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -54,9 +57,39 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.4.0'
     androidTestImplementation 'androidx.test:rules:1.4.0'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
+    androidTestUtil 'androidx.test:orchestrator:1.4.1'
 }
-repositories {
-    mavenCentral()
+def coverageEnabled = project.hasProperty('coverage')
+
+if (coverageEnabled) {
+    // gradle -Pcoverage firebaseJacoco
+    task firebaseJacoco(type: JacocoReport) {
+        group = "Reporting"
+        description = "Generate Jacoco coverage reports for Firebase test lab."
+
+        def excludes = [
+                '**/R.class',
+                '**/R$*.class',
+                '**/BuildConfig.*',
+                "**/androidx"]
+        def javaClasses = fileTree(dir: "${project.buildDir}/intermediates/javac/debug/classes", excludes: excludes)
+        def kotlinClasses = fileTree(dir: "${project.buildDir}/tmp/kotlin-classes/debug", excludes: excludes)
+        getClassDirectories().setFrom(files([javaClasses, kotlinClasses]))
+
+        getSourceDirectories().setFrom(files([
+                'src/main/java', 'src/main/kotlin',
+                'src/androidTest/java', 'src/androidTest/kotlin']))
+
+        def ecFiles = project.fileTree(dir: '..', include: 'results/coverage_ec/**/sdcard/*.ec')
+        ecFiles.forEach { println("Reading in $it") }
+        getExecutionData().setFrom(ecFiles)
+
+        reports {
+            html { enabled true }
+            xml { enabled false }
+        }
+    }
 }
+
 
 
