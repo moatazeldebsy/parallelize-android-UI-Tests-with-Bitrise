@@ -1,44 +1,52 @@
 ---
-format_version: '8'
-default_step_lib_source: 'https://github.com/bitrise-io/bitrise-steplib.git'
+format_version: '11'
+default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 project_type: android
-trigger_map:
-- push_branch: '*'
-  workflow: primary
-- pull_request_source_branch: '*'
-  workflow: primary
 workflows:
-  primary:
+  parallel-tests:
+    description: |
+      Runs tests.
+
+      Next steps:
+      - Check out [Getting started with Android apps](https://devcenter.bitrise.io/en/getting-started/getting-started-with-android-apps.html).
     steps:
-    - activate-ssh-key@4:
-        run_if: '{{getenv "SSH_RSA_PRIVATE_KEY" | ne ""}}'
-    - git-clone@4: {}
-    - cache-pull@2: {}
+    - activate-ssh-key@4: {}
     - file-downloader@1:
         title: Download Google Service Account JSON
         inputs:
-        - source: $ADD_YOUR_SERVICE_ACCOUNT_URL
-        - destination: ./keys/firebase-key.json
+        - source: "$BITRISEIO_SERVICE_ACCOUNT_URL"
+        - destination: "./keys/firebase-key.json"
     - script@1:
         inputs:
-        - content: >-
-            #!/usr/bin/env bash
-            # fail if any commands fails
-            set -e
-            # debug log
-            set -x
-            echo "$SERVICE_ACCOUNT_KEY_JSON" >
-            $HOME/.config/gcloud/application_default_credentials.json
-            gcloud auth activate-service-account --project=$GOOGLE_CLOUD_PROJECT
-            --key-file=$SERVICE_ACCOUNT_KEY_JSON
-        title: Save Google Service Account JSON
-    - install-missing-android-tools@2:
+        - content: "#!/usr/bin/env bash\nset -e\nset -o pipefail\nset -x\n\necho \"$SERVICE_ACCOUNT_KEY_JSON\"
+            > $HOME/.config/gcloud/application_default_credentials.json \n\ngcloud
+            auth activate-service-account --project=$GOOGLE_CLOUD_PROJECT --key-file=$SERVICE_ACCOUNT_KEY_JSON"
+        title: Configure Google Service Account
+    - git-clone@6: {}
+    - cache-pull@2: {}
+    - install-missing-android-tools@3:
         inputs:
-        - gradlew_path: $PROJECT_LOCATION/gradlew
+        - gradlew_path: "$PROJECT_LOCATION/gradlew"
     - android-build-for-ui-testing@0:
         inputs:
         - variant: debug
         - module: app
+    - script@1:
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            # fail if any commands fails
+            set -e
+            # make pipelines' return status equal the last command to exit with a non-zero status, or zero if all commands exit successfully
+            set -o pipefail
+            # debug log
+            set -x
+
+            gcloud firebase test android run \
+              --type instrumentation \
+              --app $BITRISE_APK_PATH \
+              --test app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
+              --device model=Pixel3,version=30,locale=en,orientation=portrait
     - script@1:
         title: Generate Flank config
         inputs:
@@ -50,14 +58,14 @@ workflows:
             set -x
             cat << FLANKEOF > ./flank.yml
             gcloud:
-              results-bucket: {YOUR BUCKET NAME}
+              results-bucket: uitests-reports
               results-dir: $BITRISE_BUILD_NUMBER
               record-video: true
               timeout: 30m
               async: false
               app: $BITRISE_APK_PATH
               test: $BITRISE_TEST_APK_PATH
-              use-orchestrator: false
+              use-orchestrator: true
               environment-variables:
                 coverage: true
                 coverageFilePath: "/sdcard/"
@@ -69,33 +77,89 @@ workflows:
                 - "annotation com.sample.samplecalculator.utils.RegressionTest"
               device:
               - model: "Pixel2"
-                version: "28"
+                version: "30"
             flank:
-              max-test-shards: 3
+              max-test-shards: 6
               num-test-runs: 1
               shard-time: 30
-              smart-flank-gcs-path: "gs://{YOUR_BUCKET_NAME}/android_ta.xml"
+              smart-flank-gcs-path: "gs://uitests-reports/android_ta.xml"
               test-targets-always-run:
-              - "annotation com.sample.samplecalculator.utils.RegressionTest"
+              - "package com.sample.samplecalculator.regression"
     - script@1:
-        title: Run Flank
         inputs:
-        - content: >-
+        - content: |-
             #!/usr/bin/env bash
-            wget --quiet
-            https://github.com/TestArmada/flank/releases/download/v21.02.0/flank.jar
-            -O /usr/local/bin/flank.jar
+            set -e
+            #set -o pipefail
+            set -x
+
+            wget --quiet https://github.com/TestArmada/flank/releases/download/v22.05.0/flank.jar -O /usr/local/bin/flank.jar
+
             java -jar /usr/local/bin/flank.jar firebase test android run
-    - deploy-to-bitrise-io@1: {}
+        title: Run Flank
+    - script@1:
+        inputs:
+        - content: |-
+            #!/bin/env bash
+
+            gcloud auth activate-service-account --project=$GOOGLE_CLOUD_PROJECT --key-file=$SERVICE_ACCOUNT_KEY_JSON
+            echo "$SERVICE_ACCOUNT_KEY_JSON" > $HOME/.config/gcloud/application_default_credentials.json
+
+            mkdir firebase-test-results
+
+            #gsutil cp "gs://uitests-reports/$BITRISE_BUILD_NUMBER/matrix_0/Pixel2-30-en-portrait/test_result_1.xml" "firebase-test-results/test_result.xml"
+
+            gsutil cp "gs://uitests-reports/$BITRISE_BUILD_NUMBER/JUnitReport.xml" "firebase-test-results/test_result.xml"
+        title: Collect Tests Results
+    - custom-test-results-export@0:
+        inputs:
+        - base_path: "./firebase-test-results/"
+        - search_pattern: "*"
+        - test_name: Firebase UI Tests Results
     - cache-push@2: {}
+    - deploy-to-bitrise-io@2: {}
+  primary:
+    description: |
+      Runs tests.
+
+      Next steps:
+      - Check out [Getting started with Android apps](https://devcenter.bitrise.io/en/getting-started/getting-started-with-android-apps.html).
+    steps:
+    - activate-ssh-key@4: {}
+    - git-clone@6: {}
+    - cache-pull@2: {}
+    - install-missing-android-tools@3:
+        inputs:
+        - gradlew_path: "$PROJECT_LOCATION/gradlew"
+    - android-build-for-ui-testing@0.1:
+        inputs:
+        - variant: debug
+        - module: app
+    - virtual-device-testing-for-android@1.1:
+        inputs:
+        - test_type: instrumentation
+        - inst_test_targets: package com.sample.samplecalculator.regression
+        - inst_use_orchestrator: 'true'
+        - num_flaky_test_attempts: '5'
+        - test_devices: Pixel3,30,en,portrait
+        title: Virtual Device Testing for Android
+    - cache-push@2: {}
+    - deploy-to-bitrise-io@2: {}
+meta:
+  bitrise.io:
+    stack: linux-docker-android-20.04
+    machine_type_id: elite-xl
 app:
   envs:
   - opts:
       is_expand: false
-    PROJECT_LOCATION: .
+    PROJECT_LOCATION: "."
   - opts:
       is_expand: false
     MODULE: app
   - opts:
       is_expand: false
     VARIANT: debug
+trigger_map:
+- pull_request_source_branch: "*"
+  workflow: primary
